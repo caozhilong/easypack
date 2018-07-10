@@ -1,0 +1,5 @@
+LOG_LEVEL=debug
+CONFIG_PATH=/etc/jobservice/app.conf
+UI_SECRET=6Cef6hk0odiHkMGJ
+JOBSERVICE_SECRET=2kD18wVJT34jGEIu
+GODEBUG=netdns=cgo
