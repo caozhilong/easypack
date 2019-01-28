@@ -17,6 +17,14 @@ chmod 777 easypack_docker.sh
 
 ```
 
+安装docker-compose
+
+```
+sudo pip install -U docker-compose
+
+curl -L https://raw.githubusercontent.com/docker/compose/1.8.0/contrib/completion/bash/docker-compose > /etc/bash_completion.d/docker-compose
+```
+
 
 
 
