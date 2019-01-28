@@ -60,7 +60,7 @@ echo
 echo "## Setting begins : upgrade php repos"
 rpm \
     -Uvh \ 
-    https://mirror.webtatic.com/yum/el7/epel-release.rpm
+    https://mirror.webtatic.com/yum/el7/webtatic-release.rpm
 if [ $? -ne 0 ]; then
   echo "Install failed..."
   exit 1
@@ -89,7 +89,11 @@ echo
 ###############################################################################
 date
 echo "## Install begins : php"
-yum install -y php
+yum -y install php72w \
+    php72w-cli php72w-common php72w-devel \
+    php72w-embedded php72w-fpm php72w-gd \
+    php72w-mbstring php72w-mysqlnd php72w-opcache \
+    php72w-pdo php72w-xml
 if [ $? -ne 0 ]; then
   echo "Install failed..."
   exit 1
