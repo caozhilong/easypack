@@ -4,6 +4,7 @@
 #VARS INIT
 #
 ###############################################################################
+PHP_VERSION=php56w
 
 
 ###############################################################################
@@ -89,11 +90,11 @@ echo
 ###############################################################################
 date
 echo "## Install begins : php"
-yum -y install php72w \
-    php72w-cli php72w-common php72w-devel \
-    php72w-embedded php72w-fpm php72w-gd \
-    php72w-mbstring php72w-mysqlnd php72w-opcache \
-    php72w-pdo php72w-xml
+yum -y install $PHP_VERSION \
+    $PHP_VERSION-cli $PHP_VERSION-common $PHP_VERSION-devel \
+    $PHP_VERSION-embedded $PHP_VERSION-fpm $PHP_VERSION-gd \
+    $PHP_VERSION-mbstring $PHP_VERSION-mysqlnd $PHP_VERSION-opcache \
+    $PHP_VERSION-pdo $PHP_VERSION-xml
 if [ $? -ne 0 ]; then
   echo "Install failed..."
   exit 1
