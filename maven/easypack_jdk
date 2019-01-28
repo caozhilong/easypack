@@ -9,6 +9,7 @@ DIR_DOWNLOAD=/tmp/download.$$
 DIR_NEW_JDK=jdk1.8.0_172
 
 JDK_TAR_GZ=jdk-8u172-linux-x64.tar.gz
+#https://download.oracle.com/otn-pub/java/jdk/8u201-b09/42970487e3af4f5aa5bca3f542482c60/jdk-8u201-linux-x64.tar.gz?AuthParam=1548046318_0b1ab66e1cd871c4f155996ec6d2fb06
 JDK_URL="http://download.oracle.com/otn-pub/java/jdk/8u172-b11/a58eab1ec242421181065cdc37240b08/${JDK_TAR_GZ}"
 
 PROFILES=/etc/profile
