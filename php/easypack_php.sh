@@ -143,4 +143,5 @@ echo
 ###############################################################################
 echo "## php version "
 php -v
+yum list installed | grep php
 echo
