@@ -1,0 +1,8 @@
+--- #Yaml sample usage: dictionary & comment
+
+# Yaml Sample usage
+# key/value pair
+# name and greeting messages
+
+{name: liumiaocn, greetingmessages: hello}
+...

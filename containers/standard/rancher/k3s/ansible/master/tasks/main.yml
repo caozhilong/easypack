@@ -1,0 +1,102 @@
+---
+# tasks file for master
+
+## create directories
+- name: create dirs for the image file
+  file:
+    path: "{{ item }}"
+    state: directory
+  with_items:
+    - "{{ var_dst_air_gap_dir }}"
+  when: var_flag_air_gap_enabled == true
+
+- name: copy air gap image file to image directory
+  copy:
+    src: "{{ item }}"
+    dest: "{{ var_dst_air_gap_dir }}"
+    mode: "{{ var_default_bin_mode }}"
+  with_items:
+    - "{{ var_src_binary }}/{{ var_src_k3s_install_script }}"
+  when: var_flag_air_gap_enabled == true
+
+- name: copy k3s and install.sh to install dir
+  copy:
+    src: "{{ item }}"
+    dest: "{{ var_k3s_dir_bin }}"
+    mode: "{{ var_default_bin_mode }}"
+  with_items:
+    - "{{ var_src_k3s }}"
+    - "{{ var_src_binary }}/{{ var_src_k3s_install_script }}"
+    - "{{ var_src_binary }}/{{ var_src_air_gap_image_name }}"
+
+- name: install semanage when selinux is enabled
+  yum:
+    name:
+      - policycoreutils-python
+    state: present
+  when: var_flag_selinux_enabled == true
+
+- name: install k3s service
+  shell: "export INSTALL_K3S_SKIP_DOWNLOAD={{ var_flag_offline_install }} \
+          && sh {{ var_k3s_dir_bin }}/{{ var_src_k3s_install_script }} {{ var_k3s_install_option }}   \
+          && firewall-cmd --add-port={{ var_k3s_server_port }}/tcp --zone=public --permanent \
+          && firewall-cmd --add-port={{ var_k3s_server_udp_port }}/udp --zone=public --permanent \
+          && firewall-cmd --reload"
+
+- name: confirm k3s service state
+  shell: "systemctl status k3s.service|grep Active"
+  register: ret_k3s_status
+  until: '"running" in ret_k3s_status.stdout'
+  retries: "{{ var_retry_max }}"
+  delay: "{{ var_delay_cnt }}"
+
+- name: copy install_agent.sh script for agent
+  template:
+    src: "{{ var_tmplate_k3s_agent_install_script }}"
+    dest: "{{ var_src_binary }}/{{ var_src_k3s_agent_install_script }}"
+
+- name: copy pause image files for load
+  copy:
+    src: "{{ item }}"
+    dest: "{{ var_k3s_dir_bin }}"
+    mode: "{{ var_download_save_mode }}"
+  with_items:
+    - "{{ var_src_binary }}/{{ var_src_pause_image_name }}.gz"
+  when: var_flag_air_gap_enabled == false
+
+- name: delete pause image file 
+  file:
+    path: "{{ item }}"
+    state: absent
+  with_items:
+    - "{{ var_k3s_dir_bin }}/{{ var_src_pause_image_name }}"
+  when: var_flag_air_gap_enabled == false
+
+- name: load pause image for k3s
+  shell: "gunzip {{ var_k3s_dir_bin }}/{{ var_src_pause_image_name }}.gz; \
+          ctr images import {{ var_k3s_dir_bin }}/{{ var_src_pause_image_name }}; \
+          ctr image rm {{ var_dst_pause_tag_name }}; \
+          ctr image tag {{ var_src_pause_tag_name }} {{ var_dst_pause_tag_name }}"
+  when: var_flag_air_gap_enabled == false
+
+- name: set token for agent script
+  shell: "k3s_server_token=`cat {{ var_k3s_server_token }}` \
+          && sed -i s/KEYWORD_REPLACE_K3S_TOKEN/${k3s_server_token}/g {{ var_src_binary }}/{{ var_src_k3s_agent_install_script }}"
+
+- name: load air gap offline image for k3s
+  shell: "ctr image import {{ var_k3s_dir_bin }}/{{ var_src_air_gap_image_name }}"
+  when: var_flag_air_gap_enabled == true
+
+- name: delete install scripts
+  file:
+    path: "{{ item }}"
+    state: absent
+  with_items:
+    - "{{ var_k3s_dir_bin }}/{{ var_src_k3s_install_script }}"
+    - "{{ var_k3s_dir_bin }}/{{ var_src_pause_image_name }}"
+    - "{{ var_k3s_dir_bin }}/{{ var_src_air_gap_image_name }}"
+
+- name: set taints node for master node 
+  shell: "kubectl taint nodes --all node.cloudprovider.kubernetes.io/uninitialized-"
+  when: var_flag_taint_node ==true
+  ignore_errors: true

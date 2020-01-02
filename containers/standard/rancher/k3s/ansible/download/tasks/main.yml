@@ -1,0 +1,37 @@
+---
+# prepare download dir
+- name: create download file in advance
+  file: 
+    path: "{{ item }}"
+    state: directory
+  with_items:
+    - "{{ var_download_base_dir }}"
+
+# tasks file for download
+- name: download binary k3s
+  get_url:
+    url:  '{{ var_download_url_k3s }}'
+    dest: '{{ var_download_file_k3s }}'
+    mode: '{{ var_download_save_mode }}'
+
+- name: download images for offline install
+  get_url:
+    url:  '{{ var_download_url_air_gap }}'
+    dest: '{{ var_download_file_air_gap }}'
+    mode: '{{ var_download_save_mode }}'
+  when: var_flag_air_gap_enabled == true
+
+# copy install.sh script for offline install
+- name: copy install.sh script for offline install
+  template:
+    src: "{{ var_src_k3s_install_script }}"
+    dest: "{{ var_src_binary }}/{{ var_src_k3s_install_script }}"
+
+- name: copy pause image tar.gz file for install
+  copy:
+    src: "{{ item }}"
+    dest: "{{ var_src_binary }}"
+    mode: "{{ var_download_save_mode }}"
+  with_items:
+    - "{{ var_src_pause_image_name }}.gz"
+  when: var_flag_air_gap_enabled == false

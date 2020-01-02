@@ -1,0 +1,8 @@
+---
+- hosts: '{{ var_k3s_server_hostname }}'
+  remote_user: root
+  gather_facts: no
+  vars_files:
+    - "../../common_vars.yml"
+  roles:
+    - master

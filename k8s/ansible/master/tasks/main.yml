@@ -1,0 +1,135 @@
+---
+# tasks file for master
+
+- name: create dirs for kubernetes master
+  file:
+    path: "{{ item }}"
+    state: directory
+  with_items:
+    - "{{ var_kube_dir_bin }}"
+    - "{{ var_kube_opt_log_dir }}"
+    - "{{ var_kube_dir_etc }}"
+  tags: 
+    - "apiserver"
+    - "controller-manager"
+    - "scheduler"
+
+- name: copy kube-apiserver to install dir
+  copy:
+    src: "{{ item }}"
+    dest: "{{ var_kube_dir_bin }}"
+    mode: "{{ var_default_bin_mode }}"
+  with_items:
+    - "{{ var_src_k8s }}/kube-apiserver"
+  tags: "apiserver"
+  
+- name: copy controller manager to install dir
+  copy:
+    src: "{{ item }}"
+    dest: "{{ var_kube_dir_bin }}"
+    mode: "{{ var_default_bin_mode }}"
+  with_items:
+    - "{{ var_src_k8s }}/kube-controller-manager"
+  tags:
+    - "controller-manager"
+
+- name: copy shceduler to install dir
+  copy:
+    src: "{{ item }}"
+    dest: "{{ var_kube_dir_bin }}"
+    mode: "{{ var_default_bin_mode }}"
+  with_items:
+    - "{{ var_src_k8s }}/kube-scheduler"
+  tags:
+    - "scheduler"
+  
+- name: create token file for apiserver
+  copy:
+    # 32 bit random string: head -c 16 /dev/urandom | od -An -t x | tr -d ' '
+    content: '00fdeedfa65384fe4dca538a54a0e8a1,kubelet-bootstrap,10001,"system:kubelet-bootstrap"'
+    dest: "{{ var_kube_dir_etc }}/{{ var_kube_api_token }}"
+  tags: 
+    - "apiserver"
+
+- name: create apiserver service file
+  template:
+    src: "{{ var_template_api_service }}"
+    dest: "{{ var_kube_api_service }}"
+  tags:
+    - "apiserver"
+
+- name: create master scheduler service file
+  template:
+    src: "{{ var_template_sch_service }}"
+    dest: "{{ var_kube_sch_service }}"
+  tags:
+    - "scheduler"
+
+- name: create master controller manager service file
+  template:
+    src: "{{ var_template_scm_service }}"
+    dest: "{{ var_kube_scm_service }}"
+  tags:
+    - "controller-manager"
+
+- name: set system service for kube-apiserver
+  shell: "systemctl daemon-reload \
+          && systemctl enable kube-apiserver \
+          && systemctl restart kube-apiserver"
+  tags:
+    - "apiserver"
+
+- name: set system service for kube-controller-manager
+  shell: "systemctl daemon-reload \
+          && systemctl enable kube-controller-manager \
+          && systemctl restart kube-controller-manager "
+  tags:
+    - "controller-manager"
+
+- name: set system service for kube-scheduler
+  shell: "systemctl daemon-reload \
+          && systemctl enable kube-scheduler \
+          && systemctl restart kube-scheduler "
+  tags:
+    - "scheduler"
+
+- name: confirm apiserver service state
+  shell: "systemctl status kube-apiserver.service|grep Active"
+  register: ret_apiserver_status
+  until: '"running" in ret_apiserver_status.stdout'
+  retries: "{{ var_retry_max }}"
+  delay: "{{ var_delay_cnt }}"
+  tags:
+    - "apiserver"
+
+- name: confirm controller manager service state
+  shell: "systemctl status kube-controller-manager.service|grep Active"
+  register: ret_k8scm_status
+  until: '"running" in ret_k8scm_status.stdout'
+  retries: "{{ var_retry_max }}"
+  delay: "{{ var_delay_cnt }}"
+  tags:
+    - "controller-manager"
+
+- name: confirm scheduler service state
+  shell: "systemctl status kube-scheduler.service|grep Active"
+  register: ret_k8sch_status
+  until: '"running" in ret_k8sch_status.stdout'
+  retries: "{{ var_retry_max }}"
+  delay: "{{ var_delay_cnt }}"
+  tags:
+    - "scheduler"
+
+- name: create clusterrolebind
+  shell: "sleep {{ var_sleep_internal }} && kubectl create clusterrolebinding {{ var_rbac_kubeletapi_role_binding }} \
+          --clusterrole={{ var_rbac_kubelet_role_apiadmin }} --user {{ var_kubeconfig_cluster }}"
+  ignore_errors: true
+  tags:
+    - "apiserver"
+
+- name: drop if exist clusterrolebinding then create clusterrolebinding
+  shell: "( ! kubectl get clusterrolebinding {{ var_kubeconfig_client_kubelet }}      \
+           || kubectl delete clusterrolebinding {{ var_kubeconfig_client_kubelet }} ) \
+           && kubectl create clusterrolebinding {{ var_kubeconfig_client_kubelet }}   \
+             --clusterrole={{ var_kubeconfig_role_bootstrapper }} \
+             --user={{ var_kubeconfig_client_kubelet }}"

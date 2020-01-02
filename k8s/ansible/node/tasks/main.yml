@@ -1,0 +1,144 @@
+---
+# tasks file for node
+
+- name: create dirs for kubelet and kube-proxy
+  file:
+    path: "{{ item }}"
+    state: directory
+  with_items:
+    - "{{ var_kube_opt_log_dir }}"
+    - "{{ var_kube_dir_bin }}"
+    - "{{ var_kube_dir_etc }}"
+  tags:
+    - "kubelet"
+    - "kube-proxy"
+
+- name: create dirs for kubelet
+  file:
+    path: "{{ item }}"
+    state: directory
+  with_items:
+    - "{{ var_kubelet_dir_working }}"
+  tags:
+    - "kubelet"
+
+- name: create dirs for kube-proxy
+  file:
+    path: "{{ item }}"
+    state: directory
+  with_items:
+    - "{{ var_kube_proxy_dir_working }}"
+  tags:
+    - "kube-proxy"
+
+- name: copy ca certificate file ca.pem
+  copy:
+    src: "{{ item }}"
+    dest: "{{ var_ssl_ca_dir }}"
+  with_items:
+    - "{{ var_ssl_ca_dir }}/{{ var_ssl_file_ca_pem }}"
+
+- name: copy config files
+  copy:
+    src: "{{ item }}"
+    dest: "{{ var_ssl_k8s_dir }}"
+  with_items:
+    - "{{ var_ssl_k8s_dir }}/{{ var_kubeconfig_bootstrap }}"
+    - "{{ var_ssl_k8s_dir }}/{{ var_kubeconfig_kubeproxy }}"
+
+- name: copy kubelet to install dir
+  copy:
+    src: "{{ item }}"
+    dest: "{{ var_docker_dir_bin }}"
+    mode: "{{ var_default_bin_mode }}"
+  with_items:
+    - "{{ var_src_k8s }}/kubelet"
+  tags:
+    - "kubelet"
+
+- name: copy kube-proxy to install dir
+  copy:
+    src: "{{ item }}"
+    dest: "{{ var_docker_dir_bin }}"
+    mode: "{{ var_default_bin_mode }}"
+  with_items:
+    - "{{ var_src_k8s }}/kube-proxy"
+  tags:
+    - "kube-proxy"
+
+- name: create kubelet service file
+  template:
+    src: "{{ var_template_kubelet_service }}"
+    dest: "{{ var_kubelet_service }}"
+  tags:
+    - "kubelet"
+
+- name: create kubelet config file
+  template:
+    src: "{{ var_template_kubelet_config }}"
+    dest: "{{ var_kube_dir_etc }}/{{ var_kubelet_opt_config }}"
+  tags:
+    - "kubelet"
+
+- name: create kube-proxy service file
+  template:
+    src: "{{ var_template_kubeproxy_service }}"
+    dest: "{{ var_kubeproxy_service }}"
+  tags:
+    - "kube-proxy"
+
+- name: create kube-proxy config file
+  template:
+    src: "{{ var_template_kubeproxy_config }}"
+    dest: "{{ var_kube_dir_etc }}/{{ var_kubeproxy_opt_config }}"
+  tags:
+    - "kube-proxy"
+
+- name: set system service for kubelet
+  shell: "systemctl daemon-reload \
+          && systemctl enable kubelet \
+          && systemctl restart kubelet "
+  tags:
+    - "kubelet"
+
+- name: set system service for kube-proxy
+  shell: "systemctl daemon-reload \
+          && systemctl enable kube-proxy \
+          && systemctl restart kube-proxy "
+  tags:
+    - "kube-proxy"
+
+- name: confirm kubelet service state
+  shell: "systemctl status kubelet.service|grep Active"
+  register: ret_kubelet_status
+  until: '"running" in ret_kubelet_status.stdout'
+  retries: "{{ var_retry_max }}"
+  delay: "{{ var_delay_cnt }}"
+  tags:
+    - "kubelet"
+
+- name: confirm kube-proxy service state
+  shell: "systemctl status kube-proxy.service|grep Active"
+  register: ret_kubeproxy_status
+  until: '"running" in ret_kubeproxy_status.stdout'
+  retries: "{{ var_retry_max }}"
+  delay: "{{ var_delay_cnt }}"
+  tags:
+    - "kube-proxy"
+
+- name: wait for kubelet csr requestor
+  shell: "kubectl get csr |grep Pending"
+  register: csr_status
+  until: '"Pending" in csr_status.stdout'
+  retries: "{{ var_retry_max }}"
+  delay: "{{ var_delay_cnt }}"
+  tags:
+    - "csr-approve"
+
+- name: get csr requestor list
+  shell: "sleep {{ var_sleep_internal }} && kubectl get csr |grep Pending|grep -v grep |awk '{print $1}'"
+  register: csr_names
+
+- name: approve csr requests
+  shell: "kubectl certificate approve {{ item }}"
+  with_items: "{{ csr_names.stdout_lines }}"
